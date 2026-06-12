@@ -7,7 +7,7 @@ Type=simple
 # Replace /PATH/TO/PROJECT with your actual directory (e.g. /home/user/restreamer-overnght)
 WorkingDirectory=/PATH/TO/PROJECT
 # Replace /PATH/TO/PROJECT with your actual directory path
-ExecStart=/PATH/TO/PROJECT/venv/bin/python /PATH/TO/PROJECT/restreamer.py
+ExecStart=/PATH/TO/PROJECT/venv/bin/python /PATH/TO/PROJECT/src/restreamer/restreamer.py
 Restart=always
 RestartSec=5
 

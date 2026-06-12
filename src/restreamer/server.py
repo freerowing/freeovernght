@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +16,7 @@ class HLSStaticFiles(StaticFiles):
         # Allow cross-origin requests for stream playback
         response.headers["Access-Control-Allow-Origin"] = "*"
         response.headers["Access-Control-Allow-Headers"] = "*"
-        
+
         # Optimize HLS caching to prevent player freezing
         if path.endswith(".m3u8"):
             response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -25,12 +24,12 @@ class HLSStaticFiles(StaticFiles):
             response.headers["Expires"] = "0"
         elif path.endswith(".ts"):
             response.headers["Cache-Control"] = "public, max-age=86400"
-            
+
         return response
 
 def create_app(engine: RestreamEngine, config: Config) -> FastAPI:
     app = FastAPI(title="Overnght HLS Player Server", version="1.0.0")
-    
+
     # Enable CORS middleware
     app.add_middleware(
         CORSMiddleware,

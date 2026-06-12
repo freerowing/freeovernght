@@ -1,100 +1,121 @@
-# Overnght Live HLS Restreamer Engine
+# Overnght Live HLS Restreamer
 
-An automated, robust pipeline built in Python to programmatically extract and restream live feeds from the Overnght sports network. It deploys an automated headless browser to authenticate and sniff live `.m3u8` feed parameters, parses out the premium highest-resolution video variant, runs an active `FFmpeg` proxy worker asynchronously, and hosts an integrated web HLS player.
+Welcome to the Overnght Live HLS Restreamer.
+
+This is an automated, robust, and highly asynchronous Python application designed to extract and restream live feeds from the Overnght sports network. It works quietly in the background, logging in automatically, sniffing out the best quality stream (e.g., 1080p), transcoding it securely via FFmpeg, and hosting it seamlessly on an integrated, minimalist HLS web player.
+
+Whether you are looking to watch a live game without interruptions or self-host your own restream server, this project provides a stable automated pipeline.
+
+---
 
 ## Features
-*   **Ultra-Minimalist HLS Player**: A clean, full-viewport video player with a black background and silent background reconnection loops that automatically start playback when the stream goes live.
-*   **Fully Asynchronous Core**: Built entirely on Python's `asyncio` event loop. The web server (FastAPI), scraper (Playwright), and transcoder (FFmpeg) run concurrently, facilitating high performance and clean process lifecycles.
-*   **Fully Headless Automation**: Leverages Playwright to manage network analysis silently in the background without browser window popups.
-*   **Dynamic Resolution Selector**: Intelligently parses master playlist manifests to force playback parameters to the absolute highest resolution variant (e.g. 1080p).
-*   **Self-Healing Loop**: Automatically detects stream drops or URL expirations, clears cache, and triggers browser re-authentication without service interruptions.
-*   **Zero-Exposure Layout**: Full isolation configuration decoupling system assets and secret keys away from standard version control trees.
+
+- **Ultra-Minimalist HLS Player**: A sleek, full-screen video player with a silent auto-reconnection loop.
+- **Fully Asynchronous Core**: Built on Python's `asyncio`. The web server (FastAPI), scraper (Playwright), and transcoder (FFmpeg) all run concurrently for high performance.
+- **Headless Automation**: Uses Playwright to securely authenticate and grab stream URLs in the background without browser popups.
+- **Dynamic Resolution Selector**: Always grabs the absolute highest quality video available in the playlist.
+- **Self-Healing**: If the stream drops or the link expires, the app automatically clears its cache, re-authenticates, and gets the video back online.
+- **Modern src/ Architecture**: A clean, fully-tested (pytest), statically-typed (mypy), and production-ready codebase separated into an isolated `src/` layout.
+
+---
 
 ## Requirements
-*   Python 3.12+
-*   FFmpeg installed on the global system path environment (`brew install ffmpeg` on macOS, `sudo apt install ffmpeg` on Debian/Ubuntu)
 
-## Installation Workflow
+- **Python 3.12+**
+- **FFmpeg**: Must be installed globally on your system.
+  - macOS: `brew install ffmpeg`
+  - Debian/Ubuntu: `sudo apt install ffmpeg`
 
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com
-    cd restreamer-overnght
-    ```
+---
 
-2.  **Initialize Virtual Environment**
-    ```bash
-    python3 -m venv venv
-    source venv/bin/activate
-    ```
+## Getting Started
 
-3.  **Install Requirements**
-    ```bash
-    pip install -r requirements.txt
-    ```
+Follow these quick steps to deploy the restreamer.
 
-4.  **Install Playwright Headless Drivers**
-    ```bash
-    playwright install chromium
-    ```
-
-## Local Configuration Management
-
-1.  Create a local runtime configurations file:
-    ```bash
-    cp .env.example .env
-    ```
-2.  Open your newly minted `.env` file and insert your credentials (`ACCOUNT_EMAIL`, `ACCOUNT_PASSWORD`, `EVENT_URL`, and `PORT`).
-
-## Service Execution Processes
-
-### Manual Deployment Context
-To test execution flows inside active shell terminal splits, run the main thread directly:
+### 1. Clone the Repository
 ```bash
-python restreamer.py
+git clone https://github.com/freerowing/freeovernght.git
+cd restreamer-overnght
 ```
-Open a browser viewport targeting `http://localhost:8080` to view your live stream.
 
+### 2. Set Up Your Environment
+Create a virtual environment to isolate the application dependencies:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-### Background Systemd User Service Integration (Optional)
-To setup persistence across system host reboot operations without manual interaction loops, configure a localized user manager node service tracking element.
+### 3. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
 
-1. Create a configuration blueprint schema inside your user service layout path:
-   `nano ~/.config/systemd/user/restreamer.service`
+### 4. Install Playwright Browsers
+This downloads the headless Chromium browser needed to sniff the streams:
+```bash
+playwright install chromium
+```
 
-2. Map out structural properties ensuring absolute pointers match your host directories:
-    ```ini
-    [Unit]
-    Description=Overnght Live HLS Restreamer Daemon Service
-    After=network.target
+---
 
-    [Service]
-    Type=simple
-    WorkingDirectory=/Users/your_username/path_to_project
-    ExecStart=/Users/your_username/path_to_project/venv/bin/python /Users/your_username/path_to_project/restreamer.py
-    Restart=always
-    RestartSec=5
+## Configuration
 
-    [Install]
-    WantedBy=default.target
-    ```
+Provide your Overnght login details so the application can authenticate on your behalf.
 
-3. Initialize system operations:
-    ```bash
-    systemctl --user daemon-reload
-    systemctl --user enable restreamer.service
-    systemctl --user start restreamer.service
-    ```
+1. Create a local configuration file from the template:
+   ```bash
+   cp .env.example .env
+   ```
+2. Open the `.env` file and configure your credentials:
+   - `ACCOUNT_EMAIL`: Your Overnght email.
+   - `ACCOUNT_PASSWORD`: Your password.
+   - `EVENT_URL`: The URL of the live event you want to watch.
+   - `PORT`: (Optional) Change the default web player port (default is 8080).
 
-4. Audit real-time background log interactions:
-    ```bash
-    journalctl --user -u restreamer.service -f
-    ```
+---
 
-## Development & Privacy Guidelines
-This repository integrates rigorous `.gitignore` parsing structures targeting runtime data objects like caching structures (`stream_url.txt`), temporary playlist segments (`*.m3u8`, `*.ts`), and account details (`.env`). Ensure modifications to the core engine engine retain absolute environment encapsulation boundaries.
+## Running the Application
 
+### Manual Deployment
+To run the server in your active terminal, execute:
+```bash
+python src/restreamer/restreamer.py
+```
+Open a browser and navigate to `http://localhost:8080` to view the stream.
 
-Yes ai was used in this repo, no idc.
+### Testing
+To run the comprehensive test suite and static analysis tools, execute:
+```bash
+pytest
+```
 
-I did this yesterday without the help of ai, but to male it more user friendly had ai build a rugged script to do it
+---
+
+## Background Service (Systemd)
+
+To run the restreamer persistently in the background and start on boot, configure it as a systemd user service:
+
+1. Edit the provided `restreamer.service` file and update all the `/PATH/TO/PROJECT` placeholders to match your absolute directory paths.
+2. Copy the file into your user's systemd config directory:
+   ```bash
+   mkdir -p ~/.config/systemd/user/
+   cp restreamer.service ~/.config/systemd/user/
+   ```
+3. Enable and start the service:
+   ```bash
+   systemctl --user daemon-reload
+   systemctl --user enable restreamer.service
+   systemctl --user start restreamer.service
+   ```
+4. Audit the real-time service logs:
+   ```bash
+   journalctl --user -u restreamer.service -f
+   ```
+
+---
+
+## Privacy & Security
+
+This codebase uses strict `.gitignore` configurations. Your `.env` credentials, `stream_url.txt` cache, generated `.m3u8` playlists, and video `.ts` segments will not be committed to source control. Ensure modifications respect these isolation boundaries.
+
+> Note: Yes, AI was used in this repo, no idc. I did this yesterday without the help of AI, but to make it more user friendly had AI build a rugged script to do it.

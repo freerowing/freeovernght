@@ -1,19 +1,22 @@
 import asyncio
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from config import Config
 
 logger = logging.getLogger("restreamer.transcoder")
 
 class Transcoder:
-    def __init__(self):
+    def __init__(self, config: "Config") -> None:
         self.process: Optional[asyncio.subprocess.Process] = None
         self.stream_url: Optional[str] = None
         self.output_path: Optional[Path] = None
         self._read_task: Optional[asyncio.Task] = None
         self.is_active = False
 
-    async def start(self, stream_url: str, output_path: Path):
+    async def start(self, stream_url: str, output_path: Path) -> None:
         if self.process:
             await self.stop()
 
@@ -54,7 +57,7 @@ class Transcoder:
             logger.error(f"Failed to start FFmpeg process: {e}")
             raise
 
-    async def _read_logs(self):
+    async def _read_logs(self) -> None:
         """Reads FFmpeg stderr/stdout output logs line-by-line asynchronously."""
         if not self.process or not self.process.stderr:
             return
@@ -84,7 +87,7 @@ class Transcoder:
         self.is_active = False
         return code
 
-    async def stop(self):
+    async def stop(self) -> None:
         """Stops the FFmpeg process gracefully."""
         self.is_active = False
         if self._read_task:
@@ -111,7 +114,7 @@ class Transcoder:
                 logger.error(f"Error while terminating FFmpeg: {e}")
             finally:
                 self.process = None
-                
+
         self.stream_url = None
         self.output_path = None
         logger.info("FFmpeg process terminated successfully.")

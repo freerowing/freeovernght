@@ -11,7 +11,7 @@ from engine import RestreamEngine
 from server import create_app
 
 # Initialize workspace directories relative to this file
-root_dir = Path(__file__).parent.absolute()
+root_dir = Path(__file__).parent.parent.parent.absolute()
 logs_dir = root_dir / "logs"
 logs_dir.mkdir(exist_ok=True)
 
@@ -35,18 +35,18 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
 logger = logging.getLogger("restreamer.main")
 
-async def main():
+async def main() -> None:
     logger.info("Initializing Overnght Restreamer Application...")
-    
+
     # Load settings configuration
     config = Config(root_dir)
-    
+
     # Initialize Core Engine Manager
     engine = RestreamEngine(config)
-    
+
     # Setup FastAPI HTTP server
     app = create_app(engine, config)
-    
+
     # Auto-start engine if configuration is already valid
     if config.is_valid():
         logger.info("Found valid environment credentials. Auto-starting restreamer engine...")
@@ -57,7 +57,7 @@ async def main():
     # Configure Uvicorn server to run in our async loop
     uvicorn_config = uvicorn.Config(
         app,
-        host="0.0.0.0",
+        host=config.host,
         port=config.port,
         log_config=None,  # We handle all logging
         loop="asyncio"
@@ -68,7 +68,7 @@ async def main():
     loop = asyncio.get_running_loop()
     stop_event = asyncio.Event()
 
-    def handle_signal():
+    def handle_signal() -> None:
         logger.info("Shutdown signal captured. Initiating clean exit...")
         stop_event.set()
 
@@ -88,7 +88,7 @@ async def main():
     # Graceful shutdown pipeline
     logger.info("Stopping Restreamer Engine & Subprocesses...")
     await engine.stop()
-    
+
     logger.info("Shutting down Web Server...")
     server.should_exit = True
     try:
@@ -96,7 +96,7 @@ async def main():
     except asyncio.TimeoutError:
         logger.warning("Uvicorn server failed to shut down in time. Cancelling task.")
         server_task.cancel()
-        
+
     logger.info("All services shut down cleanly. System terminated.")
 
 if __name__ == "__main__":
