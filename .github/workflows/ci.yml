@@ -27,12 +27,12 @@ jobs:
       run: playwright install chromium
         
     - name: Run Ruff
-      run: ruff check .
+      run: ruff check src tests
       continue-on-error: true
       
     - name: Run Mypy
-      run: mypy engine.py config.py sniffer.py transcoder.py server.py --ignore-missing-imports
+      run: mypy src/restreamer --ignore-missing-imports
       continue-on-error: true
       
     - name: Run Tests
-      run: pytest test_engine.py -v
+      run: pytest tests/ -v
