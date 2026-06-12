@@ -82,7 +82,7 @@ async def sniff_stream_url(config: Config) -> str:
                 "--no-first-run",
                 "--no-zygote",
                 "--single-process",
-                "--autoplay-policy=no-user-gesture-required"
+                "--autoplay-policy=no-user-gesture-required",
                 "--mute-audio"
             ]
         )
