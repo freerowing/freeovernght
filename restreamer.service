@@ -1,0 +1,15 @@
+[Unit]
+Description=Overnght Live HLS Restreamer Web Service & Engine
+After=network.target
+
+[Service]
+Type=simple
+# Replace /PATH/TO/PROJECT with your actual directory (e.g. /home/user/restreamer-overnght)
+WorkingDirectory=/PATH/TO/PROJECT
+# Replace /PATH/TO/PROJECT with your actual directory path
+ExecStart=/PATH/TO/PROJECT/venv/bin/python /PATH/TO/PROJECT/restreamer.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

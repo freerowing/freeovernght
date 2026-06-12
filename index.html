@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+    <video id="player" controls autoplay muted playsinline></video>
+    <script>
+        const video = document.getElementById('player');
+        const streamUrl = '/media/local.m3u8';
+        let hls = null;
+        let retryTimer = null;
+
+        function loadStream() {
+            if (retryTimer) {
+                clearTimeout(retryTimer);
+                retryTimer = null;
+            }
+
+            if (Hls.isSupported()) {
+                if (hls) {
+                    hls.destroy();
+                }
+                
+                hls = new Hls({
+                    manifestLoadingTimeOut: 10000,
+                    manifestLoadingMaxRetry: 3,
+                    levelLoadingTimeOut: 10000,
+                    levelLoadingMaxRetry: 3
+                });
+                hls.loadSource(streamUrl);
+                hls.attachMedia(video);
+                
+                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                    video.play().catch(e => console.log("Play failed:", e));
+                });
+                
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        console.log("Fatal HLS error, retrying in 3 seconds...", data);
+                        hls.destroy();
+                        hls = null;
+                        retryTimer = setTimeout(loadStream, 3000);
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                video.src = streamUrl;
+                video.addEventListener('error', handleNativeError);
+            }
+        }
+
+        function handleNativeError() {
+            console.log("Native error, retrying in 3 seconds...");
+            video.removeEventListener('error', handleNativeError);
+            retryTimer = setTimeout(() => {
+                video.src = streamUrl;
+                video.addEventListener('error', handleNativeError);
+            }, 3000);
+        }
+
+        loadStream();
+    </script>
+</body>
+</html>

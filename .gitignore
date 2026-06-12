@@ -1,0 +1,15 @@
+.env
+venv/
+.venv/
+__pycache__/
+*.m3u8
+*.ts
+stream_url.txt
+.DS_Store
+media/*
+cache/*
+logs/*
+*.log
+.pytest_cache/
+.vscode/
+.idea/
