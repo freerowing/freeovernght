@@ -93,3 +93,8 @@ To setup persistence across system host reboot operations without manual interac
 
 ## Development & Privacy Guidelines
 This repository integrates rigorous `.gitignore` parsing structures targeting runtime data objects like caching structures (`stream_url.txt`), temporary playlist segments (`*.m3u8`, `*.ts`), and account details (`.env`). Ensure modifications to the core engine engine retain absolute environment encapsulation boundaries.
+
+
+Yes ai was used in this repo, no idc.
+
+I did this yesterday without the help of ai, but to male it more user friendly had ai build a rugged script to do it
