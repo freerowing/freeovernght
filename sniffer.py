@@ -70,7 +70,20 @@ async def sniff_stream_url(config: Config) -> str:
     cookies_path = config.cache_dir / "cookies.json"
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        # Launch Chromium with performance optimizations for low-resource hardware like Pi 4
+        logger.info(f"Launching browser (Headless: {config.headless})...")
+        browser = await p.chromium.launch(
+            headless=config.headless,
+            args=[
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--no-first-run",
+                "--no-zygote",
+                "--single-process"
+            ]
+        )
         
         # Load cached cookies if available
         context_args = {

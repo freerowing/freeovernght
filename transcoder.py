@@ -27,6 +27,7 @@ class Transcoder:
         cmd = [
             "ffmpeg",
             "-y",
+            "-loglevel", "warning",  # Suppresses frame-by-frame status lines to save CPU
             "-reconnect", "1",
             "-reconnect_at_eof", "1",
             "-reconnect_streamed", "1",

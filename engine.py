@@ -92,7 +92,7 @@ class RestreamEngine:
 
     async def _run_loop(self):
         """Main orchestrator loop."""
-        retry_delay = 5.0
+        retry_delay = 10.0
         
         while self.is_running:
             try:
@@ -122,13 +122,11 @@ class RestreamEngine:
                         self.error_message = f"Browser automation error: {str(e)}"
                         self.set_state("ERROR")
                         logger.error(f"Failed to acquire stream: {e}")
-                        # Exponential backoff up to 60s
+                        
+                        logger.info(f"Retrying sniffing in {retry_delay:.1f}s (exponential backoff)...")
                         await asyncio.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 1.5, 60.0)
+                        retry_delay = min(retry_delay * 1.5, 300.0)
                         continue
-
-                # Reset retry delay on successful Sniffing
-                retry_delay = 5.0
 
                 # 4. Transcoding phase
                 self.set_state("TRANSCODING")
@@ -141,26 +139,38 @@ class RestreamEngine:
                     await self.transcoder.start(self.active_url, output_file)
                     exit_code = await self.transcoder.wait()
                     
-                    # Check if FFmpeg failed immediately (likely due to expired URL)
                     duration = time.time() - transcode_start_time
-                    if duration < 10.0 and self.is_running:
-                        logger.warning(f"FFmpeg terminated quickly (in {duration:.1f}s). Stream URL likely expired.")
+                    if duration < 60.0:
+                        # Quick exit (likely stream offline or expired link)
+                        logger.warning(f"FFmpeg terminated quickly (in {duration:.1f}s). Stream offline or link expired.")
                         self.active_url = None
                         if cache_file.exists():
                             cache_file.unlink(missing_ok=True)
-                        self.error_message = "Stream link expired or failed to transcode. Recapturing..."
+                        
+                        self.error_message = f"Stream offline or failed to transcode. Retrying in {retry_delay:.1f}s..."
                         self.set_state("ERROR")
-                        await asyncio.sleep(5)
+                        
+                        await asyncio.sleep(retry_delay)
+                        retry_delay = min(retry_delay * 1.5, 300.0)
                     else:
-                        logger.info(f"FFmpeg process ended after {duration:.1f}s.")
+                        # Successful transcode of 60s+ reset retry delay
+                        logger.info(f"FFmpeg process ended after successful run of {duration:.1f}s.")
+                        retry_delay = 10.0
                         if self.is_running:
-                            # Let's wait a moment and try again.
                             await asyncio.sleep(2)
+                            
                 except Exception as e:
                     logger.error(f"Error during transcoding process: {e}")
+                    self.active_url = None
+                    if cache_file.exists():
+                        cache_file.unlink(missing_ok=True)
+                        
                     self.error_message = f"Transcoder failed: {str(e)}"
                     self.set_state("ERROR")
-                    await asyncio.sleep(5)
+                    
+                    logger.info(f"Retrying sniffing in {retry_delay:.1f}s...")
+                    await asyncio.sleep(retry_delay)
+                    retry_delay = min(retry_delay * 1.5, 300.0)
                     
             except asyncio.CancelledError:
                 break

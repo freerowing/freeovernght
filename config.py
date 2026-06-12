@@ -32,6 +32,7 @@ class Config:
         self.password = os.getenv("ACCOUNT_PASSWORD", "")
         self.login_url = os.getenv("LOGIN_URL", "https://www.overnght.com/auth/login")
         self.event_url = os.getenv("EVENT_URL", "")
+        self.headless = os.getenv("HEADLESS", "true").lower() == "true"
         
         try:
             self.port = int(os.getenv("PORT", "8080"))
