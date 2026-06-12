@@ -71,6 +71,15 @@ class RestreamEngine:
             except Exception as e:
                 logger.warning(f"Could not delete stream url cache file: {e}")
         
+        # Clear cookies file
+        cookies_file = self.config.cache_dir / "cookies.json"
+        if cookies_file.exists():
+            try:
+                cookies_file.unlink()
+                logger.info("Deleted cached session cookies.")
+            except Exception as e:
+                logger.warning(f"Could not delete cookies cache file: {e}")
+        
         self.active_url = None
         await self.transcoder.stop()
         

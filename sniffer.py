@@ -62,19 +62,26 @@ async def resolve_highest_quality_stream(url: str) -> str:
     return url
 
 async def sniff_stream_url(config: Config) -> str:
-    """Uses Playwright to log in and sniff the livestream .m3u8 URL."""
+    """Uses Playwright to log in and sniff the livestream .m3u8 URL, caching cookies for session reuse."""
     if not config.is_valid():
         raise ValueError("Configuration credentials or Event URL are missing.")
 
     logger.info("🤖 Starting headless browser automation...")
+    cookies_path = config.cache_dir / "cookies.json"
     
     async with async_playwright() as p:
-        # Launch Chromium headless
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            viewport={"width": 1280, "height": 720},
-            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        )
+        
+        # Load cached cookies if available
+        context_args = {
+            "viewport": {"width": 1280, "height": 720},
+            "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        if cookies_path.exists():
+            logger.info("Loading session state/cookies from cache...")
+            context_args["storage_state"] = str(cookies_path)
+            
+        context = await browser.new_context(**context_args)
         page = await context.new_page()
         
         captured_url = None
@@ -84,66 +91,96 @@ async def sniff_stream_url(config: Config) -> str:
             nonlocal captured_url
             url = req.url
             if ".m3u8" in url and not captured_url:
-                # Avoid capturing sub-variants directly if possible, catch master/index playlist
-                # Usually overnght serves a master list first or directly serves stream chunks
                 captured_url = url
                 logger.info(f"🔗 Sniffed HLS stream URL candidate: {url}")
 
         page.on("request", handle_request)
         
-        # 1. Login Phase
-        logger.info(f"Navigating to login page: {config.login_url}")
-        try:
-            await page.goto(config.login_url, timeout=30000, wait_until="domcontentloaded")
-            
-            # Wait for email input
-            logger.info("Waiting for login form fields...")
-            email_selector = 'input[type="email"]'
-            password_selector = 'input[type="password"]'
-            await page.wait_for_selector(email_selector, timeout=15000)
-            
-            # Type email character by character to trigger frontend validations
-            logger.info("Entering email...")
-            email_field = page.locator(email_selector)
-            await email_field.click()
-            await email_field.fill("")
-            await email_field.press_sequentially(config.email, delay=30)
-            
-            # Type password character by character
-            logger.info("Entering password...")
-            password_field = page.locator(password_selector)
-            await password_field.click()
-            await password_field.fill("")
-            await password_field.press_sequentially(config.password, delay=30)
-            
-            # Brief delay to allow field change handlers to process
-            await asyncio.sleep(0.5)
-            
-            # Wait up to 5s for submit button to enable
-            submit_selector = 'button[type="submit"]'
+        # Try direct navigation using cached session
+        session_valid = False
+        if cookies_path.exists():
             try:
-                await page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=5000)
-                logger.info("Submit button is enabled.")
-            except Exception:
-                logger.warning("Submit button remained disabled. Attempting click with force...")
+                logger.info(f"Attempting direct navigation to Event URL: {config.event_url}")
+                await page.goto(config.event_url, timeout=20000, wait_until="domcontentloaded")
                 
-            logger.info("Submitting credentials...")
-            await page.click(submit_selector, force=True)
-            
-            # Wait for navigation / state load
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            logger.info("Authentication complete. Navigating to event URL...")
-        except Exception as e:
-            logger.error(f"❌ Authentication phase failed: {e}")
-            await browser.close()
-            raise
-            
-        # 2. Event Sniffing Phase
+                # Check if we were redirected to a login/auth page
+                current_url = page.url
+                if "login" in current_url.lower() or "auth" in current_url.lower():
+                    logger.info("Session expired (redirected to auth). Proceeding to full login...")
+                else:
+                    # Wait up to 10 seconds to see if we capture the stream URL
+                    logger.info("Event page loaded, waiting to capture stream URL...")
+                    for _ in range(10):
+                        if captured_url:
+                            session_valid = True
+                            break
+                        await asyncio.sleep(1)
+            except Exception as e:
+                logger.warning(f"Direct navigation with cached cookies failed: {e}")
+
+        # Perform full login flow if session is invalid or not available
+        if not session_valid:
+            logger.info("Running full login authentication sequence...")
+            try:
+                await page.goto(config.login_url, timeout=30000, wait_until="domcontentloaded")
+                
+                # Wait for email input
+                logger.info("Waiting for login form fields...")
+                email_selector = 'input[type="email"]'
+                password_selector = 'input[type="password"]'
+                await page.wait_for_selector(email_selector, timeout=15000)
+                
+                # Type email character by character to trigger validations
+                logger.info("Entering email...")
+                email_field = page.locator(email_selector)
+                await email_field.click()
+                await email_field.fill("")
+                await email_field.press_sequentially(config.email, delay=30)
+                
+                # Type password character by character
+                logger.info("Entering password...")
+                password_field = page.locator(password_selector)
+                await password_field.click()
+                await password_field.fill("")
+                await password_field.press_sequentially(config.password, delay=30)
+                
+                await asyncio.sleep(0.5)
+                
+                # Wait up to 5s for submit button to enable
+                submit_selector = 'button[type="submit"]'
+                try:
+                    await page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=5000)
+                    logger.info("Submit button is enabled.")
+                except Exception:
+                    logger.warning("Submit button remained disabled. Attempting click with force...")
+                    
+                logger.info("Submitting credentials...")
+                await page.click(submit_selector, force=True)
+                
+                # Wait for navigation / state load
+                await page.wait_for_load_state("networkidle", timeout=15000)
+                logger.info("Authentication complete. Saving storage state/cookies...")
+                
+                # Save storage state
+                await context.storage_state(path=str(cookies_path))
+                logger.info(f"Session cookies successfully saved to {cookies_path}")
+                
+            except Exception as e:
+                logger.error(f"❌ Authentication phase failed: {e}")
+                await browser.close()
+                raise
+                
+            # Navigate to event page after login
+            try:
+                logger.info(f"Navigating to Event URL: {config.event_url}")
+                await page.goto(config.event_url, timeout=30000, wait_until="domcontentloaded")
+            except Exception as e:
+                logger.error(f"❌ Event navigation failed: {e}")
+                await browser.close()
+                raise
+
+        # Wait to capture the .m3u8 url if not already captured
         try:
-            logger.info(f"Navigating to Event URL: {config.event_url}")
-            await page.goto(config.event_url, timeout=30000, wait_until="domcontentloaded")
-            
-            # Wait to capture the .m3u8 url
             for seconds in range(30):
                 if captured_url:
                     break
@@ -152,7 +189,7 @@ async def sniff_stream_url(config: Config) -> str:
             if not captured_url:
                 raise TimeoutError("Failed to intercept any .m3u8 stream request within 30 seconds.")
                 
-            # Resolve highest quality variant if it is a master playlist
+            # Resolve highest quality variant
             final_url = await resolve_highest_quality_stream(captured_url)
             
             # Write to cache file for safety
