@@ -70,7 +70,7 @@ async def sniff_stream_url(config: Config) -> str:
     cookies_path = config.cache_dir / "cookies.json"
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(headless=False)
         
         # Load cached cookies if available
         context_args = {
@@ -103,10 +103,12 @@ async def sniff_stream_url(config: Config) -> str:
                 logger.info(f"Attempting direct navigation to Event URL: {config.event_url}")
                 await page.goto(config.event_url, timeout=20000, wait_until="domcontentloaded")
                 
-                # Check if we were redirected to a login/auth page
+                # Check if we were redirected to a login/auth page or if a login input is visible
                 current_url = page.url
                 if "login" in current_url.lower() or "auth" in current_url.lower():
                     logger.info("Session expired (redirected to auth). Proceeding to full login...")
+                elif await page.locator('input[type="email"]').is_visible():
+                    logger.info("Session expired (login email input detected on page). Proceeding to full login...")
                 else:
                     # Wait up to 10 seconds to see if we capture the stream URL
                     logger.info("Event page loaded, waiting to capture stream URL...")
@@ -124,46 +126,59 @@ async def sniff_stream_url(config: Config) -> str:
             try:
                 await page.goto(config.login_url, timeout=30000, wait_until="domcontentloaded")
                 
-                # Wait for email input
-                logger.info("Waiting for login form fields...")
-                email_selector = 'input[type="email"]'
-                password_selector = 'input[type="password"]'
-                await page.wait_for_selector(email_selector, timeout=15000)
-                
-                # Type email character by character to trigger validations
-                logger.info("Entering email...")
-                email_field = page.locator(email_selector)
-                await email_field.click()
-                await email_field.fill("")
-                await email_field.press_sequentially(config.email, delay=30)
-                
-                # Type password character by character
-                logger.info("Entering password...")
-                password_field = page.locator(password_selector)
-                await password_field.click()
-                await password_field.fill("")
-                await password_field.press_sequentially(config.password, delay=30)
-                
-                await asyncio.sleep(0.5)
-                
-                # Wait up to 5s for submit button to enable
-                submit_selector = 'button[type="submit"]'
-                try:
-                    await page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=5000)
-                    logger.info("Submit button is enabled.")
-                except Exception:
-                    logger.warning("Submit button remained disabled. Attempting click with force...")
+                # Check if we got redirected away immediately because we are already logged in
+                current_url = page.url
+                if "login" not in current_url.lower() and "auth" not in current_url.lower():
+                    logger.info("Already logged in (redirected away from login page). Saving cookies...")
+                    await context.storage_state(path=str(cookies_path))
+                else:
+                    # Wait for email input
+                    logger.info("Waiting for login form fields...")
+                    email_selector = 'input[type="email"]'
+                    password_selector = 'input[type="password"]'
+                    await page.wait_for_selector(email_selector, timeout=15000)
                     
-                logger.info("Submitting credentials...")
-                await page.click(submit_selector, force=True)
-                
-                # Wait for navigation / state load
-                await page.wait_for_load_state("networkidle", timeout=15000)
-                logger.info("Authentication complete. Saving storage state/cookies...")
-                
-                # Save storage state
-                await context.storage_state(path=str(cookies_path))
-                logger.info(f"Session cookies successfully saved to {cookies_path}")
+                    # Type credentials character-by-character
+                    logger.info("Entering email...")
+                    email_field = page.locator(email_selector)
+                    await email_field.click()
+                    await email_field.fill("")
+                    await email_field.press_sequentially(config.email, delay=30)
+                    
+                    logger.info("Entering password...")
+                    password_field = page.locator(password_selector)
+                    await password_field.click()
+                    await password_field.fill("")
+                    await password_field.press_sequentially(config.password, delay=30)
+                    
+                    await asyncio.sleep(0.5)
+                    
+                    # Wait up to 5s for submit button to enable
+                    submit_selector = 'button[type="submit"]'
+                    try:
+                        await page.wait_for_selector('button[type="submit"]:not([disabled])', timeout=5000)
+                        logger.info("Submit button is enabled.")
+                    except Exception:
+                        logger.warning("Submit button remained disabled. Attempting click with force...")
+                        
+                    logger.info("Submitting credentials...")
+                    await page.click(submit_selector, force=True)
+                    
+                    # Wait for the URL to change to indicate successful redirect/auth completion
+                    try:
+                        logger.info("Waiting for redirect away from login page...")
+                        await page.wait_for_url(lambda url: "auth/login" not in url.lower() and "login" not in url.lower(), timeout=15000)
+                        logger.info("Redirect completed successfully.")
+                    except Exception as e:
+                        logger.warning(f"URL did not redirect away from login within timeout: {e}")
+                    
+                    # Wait for network idle to ensure cookies/tokens are set
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                    await asyncio.sleep(1) # Extra buffer for cookies to write
+                    
+                    # Save storage state
+                    await context.storage_state(path=str(cookies_path))
+                    logger.info(f"Session cookies successfully saved to {cookies_path}")
                 
             except Exception as e:
                 logger.error(f"❌ Authentication phase failed: {e}")
