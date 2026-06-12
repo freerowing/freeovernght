@@ -39,6 +39,7 @@ class Config:
         self.event_url = os.getenv("EVENT_URL", "")
         self.headless = os.getenv("HEADLESS", "true").lower() == "true"
         self.host = os.getenv("HOST", "127.0.0.1")
+        self.browser_executable_path = os.getenv("BROWSER_EXECUTABLE_PATH")
 
         try:
             self.port = int(os.getenv("PORT", "8080"))

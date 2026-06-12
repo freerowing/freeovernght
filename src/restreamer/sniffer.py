@@ -76,9 +76,10 @@ async def resolve_highest_quality_stream(url: str) -> str:
 
 async def _setup_browser(p: Any, config: Config) -> Any:
     logger.info(f"Launching browser (Headless: {config.headless})...")
-    return await p.chromium.launch(
-        headless=config.headless,
-        args=[
+
+    launch_kwargs = {
+        "headless": config.headless,
+        "args": [
             "--disable-gpu",
             "--disable-dev-shm-usage",
             "--no-sandbox",
@@ -89,7 +90,12 @@ async def _setup_browser(p: Any, config: Config) -> Any:
             "--autoplay-policy=no-user-gesture-required",
             "--mute-audio"
         ]
-    )
+    }
+
+    if config.browser_executable_path:
+        launch_kwargs["executable_path"] = config.browser_executable_path
+
+    return await p.chromium.launch(**launch_kwargs)
 
 async def _attempt_direct_navigation(page: Any, config: Config, cookies_path: Any, captured_url: list[str | None]) -> bool:
     if not cookies_path.exists():
