@@ -81,7 +81,8 @@ async def sniff_stream_url(config: Config) -> str:
                 "--disable-setuid-sandbox",
                 "--no-first-run",
                 "--no-zygote",
-                "--single-process"
+                "--single-process",
+                "--autoplay-policy=no-user-gesture-required"
             ]
         )
         
